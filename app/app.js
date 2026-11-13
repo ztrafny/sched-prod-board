@@ -21,52 +21,79 @@ function rowHtml(i) {
     <span class="act"></span>`;
 }
 
+// A row carries no Ack (product, after step 1): it shows the acked mark once its incident is acked.
 function setAction(li) {
-  const id = li.dataset.id;
-  const act = li.querySelector('.act');
-  act.innerHTML = acked.has(id)
+  li.querySelector('.act').innerHTML = acked.has(li.dataset.id)
     ? '<span data-testid="acked" class="acked">acked</span>'
-    : `<button type="button" data-testid="ack" aria-label="Ack ${esc(id)}">Ack</button>`;
+    : '<span class="open">Open ›</span>';
 }
 
-// Rows are keyed by incident id: existing rows stay in place (and keep their state);
-// new ones are inserted above them in API order, newest first (R1).
+// Rows are keyed by incident id. Existing rows are never moved or removed (a moved row is a row
+// taken from under the pointer); incidents not seen before go on top, in API order, newest first (R1).
 function render(incidents) {
-  const have = new Map([...list.children].map((li) => [li.dataset.id, li]));
-  let prev = null;
+  const seen = new Set([...list.children].map((li) => li.dataset.id));
+  const anchor = list.firstChild;
   for (const i of incidents) {
-    let li = have.get(i.id);
-    if (!li) {
-      li = document.createElement('li');
-      li.setAttribute('data-testid', 'incident-row');
-      li.dataset.id = i.id;
-      li.className = `row ${i.severity}`;
-      li.innerHTML = rowHtml(i);
-      setAction(li);
-    }
-    have.delete(i.id);
-    const at = prev ? prev.nextSibling : list.firstChild;
-    if (li !== at) list.insertBefore(li, at);
-    prev = li;
+    if (seen.has(i.id)) continue;
+    const li = document.createElement('li');
+    li.setAttribute('data-testid', 'incident-row');
+    li.dataset.id = i.id;
+    li.className = `row ${i.severity}`;
+    li.innerHTML = rowHtml(i);
+    setAction(li);
+    list.insertBefore(li, anchor);
   }
-  for (const gone of have.values()) gone.remove();
-  empty.hidden = incidents.length > 0;
+  empty.hidden = list.children.length > 0;
 }
 
-// R2: the click acks the row it sits in, by that row's id, never by position.
-list.addEventListener('click', async (e) => {
-  const btn = e.target.closest('[data-testid="ack"]');
-  if (!btn) return;
-  const li = btn.closest('[data-testid="incident-row"]');
-  btn.disabled = true;
+// R2 (changed by product): a row opens its incident panel; Ack lives in the panel and acks the
+// incident the panel names, so a row moving under the pointer can never ack the wrong incident.
+const panel = document.querySelector('[data-testid="incident-panel"]');
+const panelId = panel.querySelector('.panel-id');
+const panelWhat = panel.querySelector('.panel-what');
+const panelAck = panel.querySelector('[data-testid="panel-ack"]');
+const panelState = panel.querySelector('.panel-state');
+let open = null; // the incident id the panel names
+
+function showPanel(li) {
+  open = li.dataset.id;
+  panelId.textContent = open;
+  panelWhat.textContent = `${li.querySelector('.sev').textContent} · ${li.querySelector('.what').textContent} · ${li.querySelector('time').textContent}`;
+  const done = acked.has(open);
+  panelAck.hidden = done;
+  panelAck.disabled = false;
+  panelAck.textContent = `Ack ${open}`;
+  panelState.textContent = done ? 'Acked.' : '';
+  panel.hidden = false;
+  for (const r of list.querySelectorAll('.row.selected')) r.classList.remove('selected');
+  li.classList.add('selected');
+}
+
+list.addEventListener('click', (e) => {
+  const li = e.target.closest('[data-testid="incident-row"]');
+  if (li) showPanel(li);
+});
+
+panelAck.addEventListener('click', async () => {
+  const id = open;
+  panelAck.disabled = true;
   try {
-    await ack(li.dataset.id);
-    acked.add(li.dataset.id);
-    setAction(li);
+    await ack(id);
+    acked.add(id);
+    const li = list.querySelector(`[data-testid="incident-row"][data-id="${CSS.escape(id)}"]`);
+    if (li) setAction(li);
+    if (open === id) { panelAck.hidden = true; panelState.textContent = 'Acked.'; }
   } catch (err) {
-    btn.disabled = false;
+    panelAck.disabled = false;
+    panelState.textContent = 'Ack failed. Try again.';
     console.error(err);
   }
+});
+
+panel.querySelector('.panel-close').addEventListener('click', () => {
+  panel.hidden = true;
+  open = null;
+  for (const r of list.querySelectorAll('.row.selected')) r.classList.remove('selected');
 });
 
 async function tick() {

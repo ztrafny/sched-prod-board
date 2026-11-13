@@ -18,6 +18,13 @@
       <p data-testid="empty" class="empty" hidden>No incidents tonight.</p>
       <ul data-testid="incident-list" class="list" aria-live="polite"></ul>
     </main>
+    <aside data-testid="incident-panel" class="panel" aria-label="Incident" hidden>
+      <button type="button" class="panel-close" aria-label="Close incident panel">×</button>
+      <h2 class="panel-id"></h2>
+      <p class="panel-what"></p>
+      <button type="button" data-testid="panel-ack" class="panel-ack">Ack</button>
+      <p class="panel-state" role="status"></p>
+    </aside>
     <footer>sched-prod incident board · build <code data-testid="build-sha">__BUILD__</code></footer>
   </body>
 </html>
