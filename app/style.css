@@ -25,3 +25,6 @@ footer { color: #777; font-size: 13px; }
 .panel-ack:disabled { opacity: .5; }
 .panel-close { position: absolute; top: 6px; right: 8px; border: 0; background: none; font-size: 20px; cursor: pointer; }
 .panel-state { margin: 8px 0 0; color: #1b6e2d; font-weight: 600; }
+/* keep the panel beside the list, never over it */
+@media (min-width: 760px) { main { padding-right: 308px; } }
+@media (max-width: 759px) { .panel { top: auto; bottom: 12px; left: 12px; right: 12px; width: auto; } main { padding-bottom: 180px; } }
